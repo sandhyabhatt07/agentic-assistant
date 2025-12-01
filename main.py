@@ -1,4 +1,3 @@
-# main.py
 #!/usr/bin/env python3
 """
 AI Agent - Main CLI Interface
@@ -48,6 +47,31 @@ def print_memory():
         print(f"     Result: {interaction['result'][:100]}...")
     print()
 
+def is_multi_part_question(user_input: str) -> bool:
+    """Detect if the input contains multiple questions"""
+    # Simple heuristics to detect multi-part questions
+    indicators = [
+        ' and also ',
+        ' and tell me ',
+        ' also ',
+        '? and ',
+        '? also',
+        ', and ',
+    ]
+    
+    user_lower = user_input.lower()
+    
+    # Check for multiple question marks
+    if user_input.count('?') > 1:
+        return True
+    
+    # Check for conjunction indicators
+    for indicator in indicators:
+        if indicator in user_lower:
+            return True
+    
+    return False
+
 def main():
     """Main CLI loop"""
     print_welcome()
@@ -90,10 +114,29 @@ def main():
             elif user_input.lower() == "help":
                 print_welcome()
                 continue
+
+            elif user_input.lower().startswith("multi:"):
+                # Handle multi-step tasks
+                task = user_input[len("multi:"):].strip()
+                print("Agent: Starting multi-step task...\n")
+                steps = agent.plan_multi_step_task(task)
+                for step_num, step in enumerate(steps, 1):
+                    print(f" Step {step_num}: {step['description']}")
+                    result = agent.run(step['input'])
+                    print(f"  Result: {result}\n")
+                print("Agent: Multi-step task completed.\n")
+                continue
             
             # Process normal query
-            print("Agent: Agent: ", end="", flush=True)
-            result = agent.run(user_input)
+            print("Agent: ", end="", flush=True)
+            
+            # Check if this is a multi-part question
+            if is_multi_part_question(user_input):
+                print("[Detected multi-part question - using multi-tool mode]\n")
+                result = agent.run_multi_tool(user_input)
+            else:
+                result = agent.run(user_input)
+            
             print(result + "\n")
     
     except KeyboardInterrupt:

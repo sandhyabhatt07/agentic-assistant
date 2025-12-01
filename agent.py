@@ -1,6 +1,7 @@
-# agent.py (Enhanced)
+# agent.py (Enhanced with better multi-tool support)
 import time
-from typing import Dict, Callable, Any, Optional
+import json
+from typing import Dict, Callable, Any, Optional, List
 from tools import calculator, wiki_search, current_datetime
 from tool_selector import ToolSelector
 from memory import conversation_memory
@@ -31,6 +32,41 @@ class Agent:
         
         agent_logger.logger.info("Agent initialized with tools: " + ", ".join(self.tools.keys()))
     
+    def decompose_question(self, task: str) -> List[Dict[str, str]]:
+        """
+        Decompose a multi-part question into separate sub-tasks
+        Returns: List of {description, query} dictionaries
+        """
+        if not self.client:
+            return [{"description": task, "query": task}]
+        
+        system_prompt = (
+            "You are a question decomposer. Break down multi-part questions into separate sub-tasks.\n"
+            "Each sub-task should be answerable by a single tool (calculator, wikipedia, or datetime).\n\n"
+            "Respond with JSON array:\n"
+            '[{"description": "calculate 5+3", "query": "5+3"}, '
+            '{"description": "get info about Python", "query": "Python programming language"}]\n\n'
+            "If it's a single question, return an array with one item."
+        )
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=config.OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Break down this question: {task}"}
+                ],
+                max_tokens=300,
+                temperature=0.0
+            )
+            
+            result = json.loads(response.choices[0].message.content.strip())
+            return result if isinstance(result, list) else [{"description": task, "query": task}]
+            
+        except Exception as e:
+            agent_logger.logger.warning(f"Error decomposing question: {e}")
+            return [{"description": task, "query": task}]
+    
     def needs_tool(self, task: str, context: str = None) -> tuple[bool, Optional[str]]:
         """
         Determine if the task needs a tool or can be answered directly.
@@ -41,16 +77,16 @@ class Agent:
         
         # Build context-aware prompt
         system_prompt = (
-                    "You are an assistant that decides if a user query needs a tool or can be answered directly.\n"
-                    "Available tools: calculator, wikipedia, datetime\n\n"
-                    "IMPORTANT: \n"
-                    "- If the user asks MULTIPLE questions, and at least one needs a tool, set needs_tool to true\n"
-                    "- If asking for confirmation/verification about previous results, you can answer directly using context\n"
-                    "- For multi-part questions (e.g., 'are you sure? what about X?'), focus on the part that needs a tool\n\n"
-                    "Respond with JSON:\n"
-                    '{"needs_tool": true/false, "response": "your direct answer if needs_tool is false"}\n\n'
-                    "If needs_tool is false, provide a helpful direct response using conversation context."
-             )
+            "You are an assistant that decides if a user query needs a tool or can be answered directly.\n"
+            "Available tools: calculator, wikipedia, datetime\n\n"
+            "IMPORTANT: \n"
+            "- If the user asks MULTIPLE questions, and at least one needs a tool, set needs_tool to true\n"
+            "- If asking for confirmation/verification about previous results, you can answer directly using context\n"
+            "- For multi-part questions (e.g., 'are you sure? what about X?'), focus on the part that needs a tool\n\n"
+            "Respond with JSON:\n"
+            '{"needs_tool": true/false, "response": "your direct answer if needs_tool is false"}\n\n'
+            "If needs_tool is false, provide a helpful direct response using conversation context."
+        )
         
         messages = [{"role": "system", "content": system_prompt}]
         
@@ -68,7 +104,6 @@ class Agent:
                 temperature=0.0
             )
             
-            import json
             result = json.loads(response.choices[0].message.content.strip())
             
             if not result.get("needs_tool", True):
@@ -225,3 +260,112 @@ class Agent:
         """Reset agent state"""
         conversation_memory.clear()
         agent_logger.logger.info("Agent reset")
+
+    def run_multi_tool(self, task: str, max_iterations: int = 5) -> str:
+        """
+        Run agent with ability to use multiple tools in sequence
+        Improved version that decomposes the question first
+        """
+        agent_logger.log_agent_start(f"[MULTI-TOOL] {task}")
+        start_time = time.time()
+        
+        print(f"\n🤖 Decomposing multi-part question...\n")
+        
+        # Step 1: Decompose the question
+        sub_tasks = self.decompose_question(task)
+        
+        if len(sub_tasks) <= 1:
+            # Not actually multi-part, use regular run
+            return self.run(task)
+        
+        print(f"📋 Found {len(sub_tasks)} sub-tasks:\n")
+        
+        # Step 2: Execute each sub-task
+        results = []
+        for i, sub_task in enumerate(sub_tasks, 1):
+            print(f"  {i}. {sub_task['description']}")
+            
+            # Select and execute tool for this sub-task
+            selection = self.selector.select_tool(sub_task['query'], use_context=True)
+            tool_name = selection.get("tool")
+            tool_input = selection.get("input", sub_task['query'])
+            
+            print(f"     → Using {tool_name}: {tool_input}")
+            
+            result, success = self.execute_tool(tool_name, tool_input)
+            
+            results.append({
+                "task": sub_task['description'],
+                "tool": tool_name,
+                "result": result,
+                "success": success
+            })
+            
+            print(f"     ✓ {result[:80]}...\n")
+        
+        # Step 3: Combine results
+        final_answer = self._synthesize_results(task, results)
+        
+        # Step 4: Store in memory
+        conversation_memory.add_interaction(
+            user_input=task,
+            tool_used="multi-tool",
+            tool_input=str([r["task"] for r in results]),
+            result=final_answer
+        )
+        
+        total_duration = time.time() - start_time
+        agent_logger.log_agent_complete(task, final_answer, total_duration)
+        
+        return final_answer
+    
+    def _synthesize_results(self, original_task: str, results: List[Dict]) -> str:
+        """
+        Synthesize multiple tool results into a coherent final answer
+        """
+        if not self.client:
+            # Fallback: just concatenate results
+            return self._combine_results_simple(results)
+        
+        # Use LLM to create a natural response
+        system_prompt = (
+            "You are synthesizing multiple tool results into a single coherent answer.\n"
+            "Combine the results naturally to answer the user's original question.\n"
+            "Be concise but complete."
+        )
+        
+        results_text = "\n".join([
+            f"- {r['task']}: {r['result']}"
+            for r in results if r['success']
+        ])
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=config.OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Original question: {original_task}\n\nResults:\n{results_text}\n\nProvide a natural answer:"}
+                ],
+                max_tokens=300,
+                temperature=0.3
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            agent_logger.logger.warning(f"Error synthesizing results: {e}")
+            return self._combine_results_simple(results)
+    
+    def _combine_results_simple(self, results: List[Dict]) -> str:
+        """Simple fallback for combining results"""
+        successful = [r for r in results if r["success"]]
+        
+        if not successful:
+            return "All tool calls failed."
+        
+        combined = "\n\n".join([
+            f"{r['task']}: {r['result']}" 
+            for r in successful
+        ])
+        
+        return combined

@@ -1,101 +1,179 @@
-# Agentic Assistant — Minimal GPT-based Agent
+# Agentic Assistant — Multi-Tool GPT Agent
 
-A minimal agentic AI assistant in Python that reads a user question, decides which tool should handle it (via GPT or a mock selector), executes the tool, and returns the result. The project demonstrates dynamic prompt construction, few-shot guidance for tool selection, validated JSON outputs from the LLM, tool execution, fallback heuristics, and simple memory/log handling.
+An intelligent AI assistant that handles single and multi-part questions by automatically selecting and orchestrating multiple tools. Built with GPT-3.5 Turbo for task decomposition, tool selection, and result synthesis.
 
 ---
 
 ## Features
 
-- GPT-driven tool selection with few-shot examples and dynamic prompt generation
-- Validation of LLM output (expects JSON: `{"tool":"<name>","input":"<text>"}`)
-- Fallback to local heuristics/mock selector when OpenAI API is unavailable
-- Tool implementations for:
-  - Calculator (safe math evaluation)
-  - Wikipedia search (summary)
-  - Date/time utilities (natural-language parsing with fallback)
-- Simple CLI loop to interact with the agent
-- Modular structure to add new tools, change selectors, or swap LLM providers
-- Logging and optional memory support (conversation/usage)
+- **Multi-Part Question Handling**: Automatically detects and answers complex questions requiring multiple tools
+- **Smart Tool Selection**: GPT-driven selection with few-shot learning and JSON validation
+- **Three Core Tools**: Calculator, Wikipedia search, DateTime utilities
+- **Conversation Memory**: Context-aware responses using interaction history
+- **Interactive CLI**: Commands for stats, memory, export, and more
+
+---
+
+## Quick Start
+
+### Installation
+
+```bash
+# Clone and install
+git clone https://github.com/yourusername/agentic-assistant.git
+cd agentic-assistant
+pip install -r requirements.txt
+
+# Set API key
+echo "OPENAI_API_KEY=your-key" > .env
+
+# Run
+python main.py
+```
+
+### Usage Examples
+
+```bash
+# Multi-part questions
+You: what is 5 + 3 and also tell me about Python
+Agent: 5 + 3 equals 8. Python is a high-level programming language...
+
+# Single questions
+You: calculate 25 * 4
+Agent: 100
+
+You: tell me about Einstein
+Agent: Albert Einstein was a theoretical physicist...
+
+# Context-aware
+You: what is 10 * 5?
+Agent: 50
+You: multiply that by 2
+Agent: 100
+
+# Commands
+You: stats      # Show statistics
+You: memory     # View history
+You: clear      # Reset memory
+You: export     # Save logs
+```
+
+---
+
+## How It Works
+
+**Single Question:**
+```
+"what is 25 * 4?" → Tool Selector → Calculator → "100"
+```
+
+**Multi-Part Question:**
+```
+"what is 5+3 and tell me about Python"
+  ↓
+Decompose: ["5+3", "Python programming"]
+  ↓
+Execute: calculator(5+3) → 8
+         wikipedia(Python) → article
+  ↓
+Synthesize → "5+3 equals 8. Python is..."
+```
 
 ---
 
 ## Project Structure
 
+```
 agentic-assistant/
-```
-├── app.py               # (simple GPT-based agent / older variant)
-├── app1.py              # keyword-based reference agent
-├── app2.py              # full GPT-based selector + CLI (example advanced)
-├── tools.py             # calculator, wiki_search, current_datetime
-├── tool_selector.py     # prompt builder and LLM selection logic (optional split)
-├── agent.py             # run_agent wrapper that orchestrates selection + execution
-├── main.py              # simple entrypoint/CLI that calls agent.run_agent
-├── config.py            # configuration (models, API keys defaults)
-├── logger.py            # logging helpers
-├── memory.py            # simple in-memory (or file) convo memory
-├── utils.py             # helpers (json parsing, safe-eval, prompt formatting)
-├── README.md            # this file
-└── requirements.txt     # Python dependencies
+├── main.py              # CLI with multi-part detection
+├── agent.py             # Core orchestrator with multi-tool execution
+├── tool_selector.py     # GPT-based tool selection
+├── tools.py             # Calculator, Wikipedia, DateTime
+├── config.py            # Configuration (model: gpt-3.5-turbo)
+├── logger.py            # Session logging and stats
+├── memory.py            # Conversation history
+└── utils.py             # Helper functions
 ```
 
 ---
 
-## Modules Overview
+## Testing Scenarios
 
-- tools.py
-  - calculator(expression): evaluate arithmetic expressions (use safe eval).
-  - wiki_search(query): returns a short Wikipedia summary (uses `wikipedia` package).
-  - current_datetime(query): interprets natural language date/time queries (LLM-assisted with keyword fallback).
+**Multi-Part:**
+- `what is 5+3 and also tell me about Python`
+- `calculate 25*4 and search for Einstein`
+- `what's the time and what is 100/5?`
 
-- tool_selector.py
-  - Build dynamic system prompts listing available tools and few-shot examples.
-  - Sends a prompt to the LLM and expects JSON output selecting a tool and input.
-  - Validates and sanitizes LLM output and falls back to a mock selector when necessary.
+**Single Tool:**
+- `what is 50 + 25?` (calculator)
+- `tell me about AI` (wikipedia)
+- `what's the date?` (datetime)
 
-- agent.py
-  - High-level orchestration: accepts a user task, calls selector, calls chosen tool, returns result.
+**Context:**
+- `what is 10 * 5?` → `multiply that by 2`
 
-- main.py
-  - CLI entrypoint that loops, reads user input, calls run_agent, prints output. Stops on `exit`/`quit`.
-
-- config.py
-  - Central place for configuration values (e.g., default model, timeouts, environment var names).
-
-- logger.py
-  - Simple logging wrapper to write logs to console/file with levels.
-
-- memory.py
-  - Optional short-term memory (e.g., last N interactions) for context reuse.
-
-- utils.py
-  - Helpers: robust JSON fragment parsing, safe expression parsing/normalization, prompt formatting.
-
-- requirements.txt
-  - Libraries required (e.g., openai, wikipedia). See the Setup section.
+**Edge Cases:**
+- `what is Python?` (ambiguous)
+- `divide 100 by 0` (error handling)
+- `asdfghjkl` (invalid input)
 
 ---
 
-## Setup
+## Configuration
 
-Requirements
-- Python 3.10+ recommended
-- Internet for OpenAI / Wikipedia calls (optional: agent works with mock offline)
+Edit `config.py`:
 
-pip install -r [requirements.txt](http://_vscodecontentref_/0)
+```python
+OPENAI_MODEL = "gpt-3.5-turbo"  # Model used
+MAX_RETRIES = 3                  # Retry attempts
+MAX_MEMORY_SIZE = 50             # Conversation history size
+```
 
-# Extending the Agent
+---
 
-Add a New Tool:
+## Adding Tools
 
+```python
 def weather_lookup(city: str):
-    return f"Weather for {city} (placeholder)"
+    return f"Weather for {city}: Sunny, 72°F"
 
 agent.add_tool(
     name="weather",
     func=weather_lookup,
-    description="Returns weather information for a city"
+    description="Get weather for a city"
 )
+```
 
-The tool will automatically appear in the LLM's prompt and be available for selection.
+Tool automatically appears in prompts and multi-tool scenarios.
 
-This project was built as a learning experiment with GitHub Copilot and GPT-based tool reasoning.
+---
+
+## Key Modules
+
+- **agent.py**: `run()` for single tasks, `run_multi_tool()` for complex queries, `decompose_question()` for task breakdown
+- **tool_selector.py**: LLM-based selection with fallback heuristics
+- **tools.py**: Calculator (safe eval), Wikipedia (with disambiguation), DateTime (NLP parsing)
+- **memory.py**: Stores recent interactions for context
+- **logger.py**: Tracks performance and exports sessions
+
+---
+
+## Troubleshooting
+
+**Multi-tool not triggering?**
+- Use clear indicators: "and also", "and tell me"
+- Or use: `multi: your question`
+
+**Wikipedia "Multiple results"?**
+- Be specific: "Python programming language" vs "Python"
+
+**API errors?**
+- Check `OPENAI_API_KEY` is set
+- Verify API quota
+
+---
+
+
+---
+
+**Built to demonstrate**: Multi-tool orchestration • Task decomposition • LLM-based reasoning • Agent architecture patterns

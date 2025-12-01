@@ -1,0 +1,6 @@
+openai
+python-dotenv
+pyyaml
+wikipedia-api
+beautifulsoup4
+requests

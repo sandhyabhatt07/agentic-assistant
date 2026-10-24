@@ -161,10 +161,12 @@ parsed from keywords and multi-part results are listed rather than synthesised.
 ```python
 from agentic_assistant import Agent, ToolError
 
+
 def weather_lookup(city: str) -> str:
     if not city.strip():
-        raise ToolError("city is required")   # becomes a failed ToolResult, not a crash
+        raise ToolError("city is required")  # becomes a failed ToolResult, not a crash
     return f"Weather for {city}: Sunny, 22°C"
+
 
 agent = Agent()
 agent.add_tool("weather", weather_lookup, "Get the current weather for a city. Input: the city name.")

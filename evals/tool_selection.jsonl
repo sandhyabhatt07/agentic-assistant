@@ -1,0 +1,22 @@
+{"task": "12 + 7", "expected": "calculator"}
+{"task": "5 * 8", "expected": "calculator"}
+{"task": "15 / 3", "expected": "calculator"}
+{"task": "2 ** 10", "expected": "calculator"}
+{"task": "what is 3 minus 2?", "expected": "calculator"}
+{"task": "divide 100 by 4", "expected": "calculator"}
+{"task": "what is the square root of 81", "expected": "calculator"}
+{"task": "calculate 25 times 4", "expected": "calculator"}
+{"task": "Who is Elon Musk?", "expected": "wikipedia"}
+{"task": "Explain GPT-4", "expected": "wikipedia"}
+{"task": "Tell me about OpenAI", "expected": "wikipedia"}
+{"task": "who was Ada Lovelace", "expected": "wikipedia"}
+{"task": "what is photosynthesis", "expected": "wikipedia"}
+{"task": "describe the Eiffel Tower", "expected": "wikipedia"}
+{"task": "information about the Mughal Empire", "expected": "wikipedia"}
+{"task": "What do you know about Bangalore?", "expected": "wikipedia"}
+{"task": "What time is it?", "expected": "datetime"}
+{"task": "Current date please", "expected": "datetime"}
+{"task": "Day of the week today", "expected": "datetime"}
+{"task": "what's the date tomorrow", "expected": "datetime"}
+{"task": "what was the date 3 days ago", "expected": "datetime"}
+{"task": "what is the date day after tomorrow", "expected": "datetime"}

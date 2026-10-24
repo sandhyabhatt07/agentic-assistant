@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentic-assistant"
+dynamic = ["version"]
+description = "A multi-tool LLM agent with task decomposition, tool selection and offline fallbacks."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Sandhya Bhatt" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "openai>=1.40,<4",
+    "python-dotenv>=1.0,<2",
+    "wikipedia>=1.4,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+]
+
+[project.scripts]
+agentic-assistant = "agentic_assistant.cli:main"
+
+[tool.setuptools]
+packages = ["agentic_assistant", "agentic_assistant.tools"]
+
+[tool.setuptools.dynamic]
+version = { attr = "agentic_assistant.__version__" }
+
+[tool.setuptools.package-data]
+agentic_assistant = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -m 'not network'"
+markers = ["network: tests that call the real Wikipedia API (run with: pytest -m network)"]
+
+[tool.coverage.run]
+source = ["agentic_assistant"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # the × and ÷ math symbols are intentional
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_ignores = false
+packages = ["agentic_assistant"]
+
+[[tool.mypy.overrides]]
+module = ["wikipedia", "wikipedia.*"]
+ignore_missing_imports = true

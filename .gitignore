@@ -1,6 +1,24 @@
+# Environments and secrets
 venv/
-__pycache__/
-*.pyc
+.venv/
 .env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Runtime output
 *.log
 agent_session.json
+evals/results/

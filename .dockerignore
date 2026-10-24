@@ -1,0 +1,10 @@
+.git
+.env
+venv
+.venv
+**/__pycache__
+*.log
+agent_session.json
+.pytest_cache
+.mypy_cache
+.ruff_cache
